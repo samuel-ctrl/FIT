@@ -1,0 +1,2 @@
+INVALID_VALUE_MESSAGE = "Invalid Value"
+ALREADY_EXIST_MESSAGE = "Already Exist"
