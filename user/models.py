@@ -1,7 +1,7 @@
 import uuid
 from django.contrib.auth.models import AbstractBaseUser
 from django.db import models
-from multiselectfield import MultiSelectField
+# from multiselectfield import MultiSelectField
 
 
 class User(AbstractBaseUser):
@@ -33,7 +33,7 @@ class User(AbstractBaseUser):
     phone = models.CharField(max_length=255, unique=True)
     email = models.CharField(max_length=255, unique=True)
     is_phone_verified = models.BooleanField(default=False)
-    remainder_settings = MultiSelectField(choices=Settings.choices, max_length=10)
+    # remainder_settings = MultiSelectField(choices=Settings.choices, max_length=10)
     is_email_verified = models.BooleanField(default=False)
     age = models.FloatField(blank=True, null=True)
     weight = models.FloatField(blank=True, null=True)

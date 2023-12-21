@@ -60,34 +60,51 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class LoginSerializer(serializers.ModelSerializer):
-    phone = serializers.CharField()
+    phone = serializers.CharField(required=False)
+    email = serializers.CharField(required=False)
 
     class Meta:
         model = User
         fields = [
             "phone",
+            "email",
         ]
 
     def validate_phone(self, value):
         if not re.match(CustomRegex.PHONE_NUMBER.value, value):
-            raise ValidationError(f"Invalid phone number: {value}")
+            raise ValidationError(f"Invalid phone number - {value}")
         return value
-
+        
+    def validate_email(self, value):
+        if not re.match(CustomRegex.SINGLE_EMAIL.value, value):
+            raise ValidationError(f"Invalid email - {value}")
+        return value   
 
 class VerifyOTPSerializer(serializers.ModelSerializer):
-    phone = serializers.CharField()
-    otp = serializers.IntegerField()
+    phone = serializers.CharField(required=False)
+    email = serializers.CharField(required=False)
+    otp = serializers.CharField(min_length=4, max_length=4)
 
     class Meta:
         model = User
-        fields = ["phone", "otp"]
+        fields = ["phone","email", "otp"]
 
     def validate_phone(self, value):
         if not re.match(CustomRegex.PHONE_NUMBER.value, value):
-            raise ValidationError(f"Invalid phone number: {value}")
+            raise ValidationError(f"Invalid phone number - {value}")
+        return value
+        
+    def validate_otp(self, value):
+        if len(value) != 4:
+            raise ValidationError(f"Invalid Otp - {value}")
         return value
 
-
+    def validate_email(self, value):
+        if not re.match(CustomRegex.SINGLE_EMAIL.value, value):
+            raise ValidationError(f"Invalid email - {value}")
+        return value    
+        
+        
 class TokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, coach):

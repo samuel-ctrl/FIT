@@ -10,15 +10,17 @@ def api_exception_handler(exc: Exception, context: dict[str, Any]) -> Response:
         error_payload["status_code"] = response.status_code
 
         if response.status_code == 401:
-            error_payload["details"] = "Authentication Failed."
+            error_payload["detail"] = "Authentication Failed."
         else:
-            errors = []
+            errors = "No detail"
             for key, val in response.data.items():
                 if isinstance(val, str):
-                    errors.append(val)
+                    errors = val
+                    break
                 elif isinstance(val, list):
-                    errors.append(val[0])
-            error_payload["details"] = errors
+                    errors = val[0]
+                    break
+            error_payload["detail"] = errors
 
         response.data = error_payload
 

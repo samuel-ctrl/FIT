@@ -78,7 +78,13 @@ class CreateBeverageSerializer(serializers.ModelSerializer):
 class WaterIntakeSerializer(serializers.ModelSerializer):
     class Meta:
         model = WaterIntake
-        exclude = ["user"]
+        exclude = ["id", "user"]
+
+    def update(self, instance, validated_data, user):
+        for key in validated_data.keys():
+            setattr(instance, key, validated_data[key])
+        instance.save()
+        return instance
 
 
 class CreateWaterIntakeSerializer(serializers.ModelSerializer):

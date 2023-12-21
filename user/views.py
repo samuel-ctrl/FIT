@@ -1,5 +1,4 @@
-import random
-
+import logging
 from django.utils import timezone
 from django.conf import settings
 from django.core.cache import cache
@@ -8,6 +7,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework import status, generics
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
+from rest_framework.serializers import ValidationError
 
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import (
@@ -16,25 +16,20 @@ from rest_framework_simplejwt.views import (
 
 from drf_spectacular.utils import extend_schema
 
-from twilio.base.exceptions import TwilioRestException
-from twilio.rest import Client
-
 from .models import User
-
 from .serializers import (
     LoginSerializer,
     UserSerializer,
     VerifyOTPSerializer,
 )
+from .utils import (
+    send_otp,
+    custom_send_mail,
+    twilio_client,
+    generate_otp
+)
 
-
-def twilio_client():
-    return Client(settings.ACCOUNT_SID, settings.AUTH_TOKEN)
-
-
-def generate_otp():
-    return str(random.randint(1000, 9999))
-
+LOGGER = logging.getLogger(__name__)
 
 @extend_schema(tags=["AUTH"])
 class LoginView(generics.CreateAPIView):
@@ -46,41 +41,34 @@ class LoginView(generics.CreateAPIView):
         serializer.is_valid(raise_exception=True)
         return serializer
 
-    @staticmethod
-    def send_otp(phone, otp):
-        # Send otp with twilio account.
-        try:
-            my_otp = f"Your OTP is {otp}."
-            client = twilio_client()
-            message = client.messages.create(
-                body=my_otp,
-                to=phone,
-                from_=settings.TWILIO_PHONE_NUMBER,
-            )
-        except TwilioRestException as e:
-            error_dict = {"send": False, "message": str(e)}
-            error_message = ""
-            if e.code == 21211:
-                error_message = "Invalid phone number"
-            elif e.code == 21608:
-                error_message = "The number is unverified."
-
-            if error_message:
-                error_dict["message"] = error_message
-            return error_dict
-        return {"send": True, "message": message}
+    def try_method(self):
+        return "real value"
 
     def post(self, request):
+        val = self.try_method()
+        return Response({"detail": val})
+
+        if request.data.get("phone") is None and request.data.get("email") is None:
+            raise ValidationError({"detail":"mandatory field phone or email."})
+
         seriaizer = self.parse_validation(data=request.data)
-        phone = seriaizer.validated_data["phone"]
         otp = generate_otp()
-        cache.set(phone, otp, timeout=300)
-        response = self.send_otp(phone, otp)
-        if response["send"]:
-            return Response({"message": "OTP sent successfully."})
-        return Response(
-            {"message": response["message"]}, status=status.HTTP_400_BAD_REQUEST
-        )
+        key = ''
+        if seriaizer.validated_data.get("phone"):
+            key = seriaizer.validated_data["phone"]
+            response = send_otp(key, otp)
+
+        else:
+            key = seriaizer.validated_data["email"]
+            response = custom_send_mail("Veryfication Code", otp, [key])
+
+        if not response["send"]:
+            return Response(
+                {"detail": response["message"]}, status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        cache.set(key, otp, timeout=300)
+        return Response({"detail": "OTP sent successfully."})
 
 
 @extend_schema(tags=["AUTH"])
@@ -96,14 +84,21 @@ class VerifyOTPView(generics.CreateAPIView):
     def post(self, request) -> Response:
         serializer = self.parse_validation(data=request.data)
         req_data = serializer.validated_data
-        cache_otp = 0000
-        # cache_otp = cache.get(phone)
 
-        if cache_otp is not None and cache_otp != int(req_data["otp"]):
-            raise Exception(details="Invalid Code")
+        verify_id =  req_data.get('phone') or req_data.get('email')
+        cache_otp = cache.get(verify_id)
+        if cache_otp is None and cache_otp != req_data["otp"]:
+            return Response({"error": "Invalid Code or Expired."}, status=status.HTTP_401_UNAUTHORIZED)
+            
+        if req_data.get('phone'):
+            user, is_created = User.objects.get_or_create(phone=verify_id)
+            user.is_phone_verified = True
+            cache.delete(req_data["phone"])
+        else:
+            user, is_created = User.objects.get_or_create(email=verify_id)
+            user.is_email_verified = True
+            cache.delete(req_data["email"])
 
-        user, _ = User.objects.get_or_create(phone=req_data["phone"])
-        user.is_phone_verified = True
         user.last_login = timezone.now()
         user.save()
 
@@ -113,8 +108,6 @@ class VerifyOTPView(generics.CreateAPIView):
             "access_token": str(token.access_token),
             "expiry_at": "1d",
         }
-
-        cache.delete(req_data["phone"])
 
         return Response(response_data, status=status.HTTP_200_OK)
 

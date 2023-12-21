@@ -1,8 +1,11 @@
 from datetime import timedelta
 from pathlib import Path
-
+import environ
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+env = environ.Env()
+environ.Env.read_env(env_file=BASE_DIR / '.env')
 
 SECRET_KEY = "django-insecure-#3yg_!j5lgsi9okv&sh-$3magdpzw*irimkr9i_$ch=$(l^2d*"
 
@@ -20,7 +23,7 @@ DJANGO_APPS = [
 THIRD_PARTY_APPS = [
     "drf_spectacular",
     "rest_framework",
-    "rest_framework_simplejwt",
+    "rest_framework_simplejwt"
 ]
 MY_APPS = [
     "user",
@@ -94,6 +97,8 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "user.User"
 
 REST_FRAMEWORK = {
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
+    'PAGE_SIZE': 10,
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
@@ -118,3 +123,14 @@ SIMPLE_JWT = {
     "REFRESH_TOKEN_LIFETIME": timedelta(days=30),
     "ROTATE_REFRESH_TOKENS": True,
 }
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_USE_TLS = True
+EMAIL_HOST = 'smtp.gmail.com'
+# Push your email
+EMAIL_HOST_USER = env('GOOGLE_MAIL')
+# Push your password
+EMAIL_HOST_PASSWORD = env('GOOGLE_MAIL_PASSWORD')
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_USE_SSL = False
